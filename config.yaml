@@ -1,0 +1,166 @@
+# =============================================================================
+# Used-Cars ML Project — Configuration
+# Person 2: ML Engineer (Modeling & Training)
+#
+# All tuneable parameters live here — nothing is hardcoded in Python files.
+# On EC2, override bucket/region with USED_CARS_BUCKET and AWS_REGION env vars.
+# Optional: TRAINING_RUN_ID env var or --run-id CLI for versioned artifact paths.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# AWS / S3  (aligned with Person 1: pipeline/config.py → used-cars-project)
+# ---------------------------------------------------------------------------
+aws:
+  region: us-east-1
+  bucket: mlds423-used-cars-project   # team bucket; override with USED_CARS_BUCKET env var
+  processed_key: processed/vehicles_clean.parquet
+  artifacts_prefix: artifacts/models/
+
+# ---------------------------------------------------------------------------
+# Feature Engineering
+# ---------------------------------------------------------------------------
+features:
+  target_column: price
+
+  numeric_features:
+    - odometer
+    - vehicle_age          # engineered: current_year - year
+
+  ordinal_features:
+    condition:
+      categories: [salvage, fair, good, excellent, like new, new]
+    cylinders:
+      categories: [3 cylinders, 4 cylinders, 5 cylinders, 6 cylinders,
+                   8 cylinders, 10 cylinders, 12 cylinders, other]
+    title_status:
+      categories: [missing, parts only, salvage, rebuilt, lien, clean]
+
+  nominal_features:
+    - manufacturer
+    - fuel
+    - transmission
+    - drive
+    - type
+    - paint_color
+    - state
+
+  # Optional native-categorical XGBoost experiment can include region without
+  # one-hot encoding. Keep it out of the shared sklearn preprocessor by default.
+  native_xgboost_categorical_features:
+    - condition
+    - cylinders
+    - title_status
+    - manufacturer
+    - fuel
+    - transmission
+    - drive
+    - type
+    - paint_color
+    - state
+    - region
+
+  drop_columns:
+    - id
+    - url
+    - region_url
+    - image_url
+    - description
+    - county
+    - lat
+    - long
+    - posting_date
+    - year          # replaced by vehicle_age
+    - model         # high cardinality
+
+  ohe_max_categories: 20
+  numeric_impute_strategy: median
+  categorical_impute_strategy: most_frequent
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+training:
+  test_size: 0.2
+  random_seed: 42
+  cv_folds: 5
+  cv_n_jobs: -1               # cross_val_score parallelism (-1 on EC2; use 1 if sandbox errors)
+  use_log_target: true        # price is right-skewed: fit on log1p(price), predict with expm1
+
+  # Week 7 baseline: Ridge regression (linear model with L2)
+  ridge:
+    alpha: 1.0
+    random_state: 42
+
+  # Tree baseline: Random Forest
+  random_forest:
+    n_estimators: 200
+    max_depth: 20
+    min_samples_leaf: 4
+    n_jobs: -1
+    random_state: 42
+
+  # Week 8 challenger: XGBoost
+  xgboost:
+    n_estimators: 500
+    learning_rate: 0.05
+    max_depth: 7
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+    random_state: 42
+    n_jobs: -1
+    early_stopping_rounds: 20
+    validation_size: 0.1    # hold-out from train for early stopping
+
+  # Native categorical XGBoost challenger.
+  # Uses pandas category dtype + enable_categorical=True instead of OHE.
+  # sklearn RandomForestRegressor does not support native string categoricals,
+  # so RF continues to use the shared encoded preprocessor.
+  xgboost_native:
+    enabled: true
+    n_estimators: 500
+    learning_rate: 0.05
+    max_depth: 7
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+    random_state: 42
+    n_jobs: -1
+    enable_categorical: true
+    tree_method: hist
+
+# ---------------------------------------------------------------------------
+# Monitoring (requirement 5: logging & monitoring)
+# Best-effort CloudWatch custom metrics for the chosen model. Skipped on local
+# (--local-output) runs and silently no-ops if AWS creds/permissions are absent.
+# ---------------------------------------------------------------------------
+monitoring:
+  push_metrics: true
+  cloudwatch_namespace: UsedCarsML
+
+# ---------------------------------------------------------------------------
+# Artifact naming (latest/ always updated; runs/<run_id>/ for history)
+# ---------------------------------------------------------------------------
+artifacts:
+  runs_prefix: artifacts/models/runs/
+  latest_prefix: artifacts/models/latest/
+  ridge_model_key: artifacts/models/latest/ridge.pkl
+  baseline_model_key: artifacts/models/latest/random_forest.pkl
+  challenger_model_key: artifacts/models/latest/xgboost.pkl
+  native_challenger_model_key: artifacts/models/latest/xgboost_native.pkl
+  best_model_key: artifacts/models/latest/best_model.pkl
+  metrics_key: artifacts/models/latest/metrics.json
+  manifest_key: artifacts/models/latest/model_manifest.json
+  feature_importance_key: artifacts/models/latest/feature_importance.csv
+
+  # Legacy flat paths (also written for backward compatibility)
+  legacy_ridge_key: artifacts/models/ridge.pkl
+  legacy_baseline_key: artifacts/models/random_forest.pkl
+  legacy_challenger_key: artifacts/models/xgboost.pkl
+  legacy_native_challenger_key: artifacts/models/xgboost_native.pkl
+  legacy_best_model_key: artifacts/models/best_model.pkl
+  legacy_metrics_key: artifacts/models/metrics.json
+  legacy_manifest_key: artifacts/models/model_manifest.json
+  legacy_importance_key: artifacts/models/feature_importance.csv

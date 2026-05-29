@@ -1,0 +1,21 @@
+# Local synthetic / dry-run scratch — NEVER the source of truth.
+# Real metrics + artifacts live in s3://<bucket>/artifacts/models/latest/.
+out/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Notebooks: keep code, drop heavy/volatile checkpoints
+.ipynb_checkpoints/
+
+# Models / data accidentally saved locally
+*.pkl
+*.parquet
+metrics.json
+
+# OS / editor
+.DS_Store
