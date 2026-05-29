@@ -1,0 +1,25 @@
+# Training image for ECS Fargate (Model Training + Artifact Storage → S3).
+# Build from the repo root:
+#   docker build -f infra/Dockerfile.train -t used-cars-train .
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Build tools for any wheels that need compiling, then clean up.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY modeling/ ./modeling/
+COPY config.yaml .
+
+# Credentials come from the ECS task role (never baked into the image).
+# Override bucket/region/run id with task-definition environment variables.
+ENV USED_CARS_BUCKET=mlds423-used-cars-project \
+    AWS_DEFAULT_REGION=us-east-1
+
+# Run EDA then training; both stream stdout to CloudWatch via the awslogs driver.
+ENTRYPOINT ["/bin/sh", "-c", "python -m modeling.eda --config config.yaml && python -m modeling.train --config config.yaml"]
