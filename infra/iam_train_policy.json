@@ -1,0 +1,32 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadProcessedData",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::mlds423-used-cars-project/processed/*"
+    },
+    {
+      "Sid": "WriteAndReadArtifacts",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::mlds423-used-cars-project/artifacts/*"
+    },
+    {
+      "Sid": "ListBucketScoped",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::mlds423-used-cars-project",
+      "Condition": {
+        "StringLike": { "s3:prefix": ["processed/*", "artifacts/*"] }
+      }
+    },
+    {
+      "Sid": "PublishTrainingMetrics",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:PutMetricData"],
+      "Resource": "*"
+    }
+  ]
+}

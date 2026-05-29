@@ -1,0 +1,8 @@
+# Lean inference dependencies (no matplotlib/seaborn needed for serving).
+pandas>=2.0
+pyarrow>=14.0
+numpy>=1.26
+scikit-learn>=1.4
+xgboost>=2.0
+pyyaml>=6.0
+boto3>=1.34
