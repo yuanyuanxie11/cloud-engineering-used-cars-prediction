@@ -136,16 +136,33 @@ def _predict(records: list[dict]) -> list[float]:
     return [round(float(v), 2) for v in np.asarray(raw).ravel()]
 
 
+def _cors_headers(content_type: str = "application/json") -> dict[str, str]:
+    return {
+        "Content-Type": content_type,
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "content-type",
+    }
+
+
 def _response(status: int, payload: dict) -> dict:
     return {
         "statusCode": status,
-        "headers": {"Content-Type": "application/json"},
+        "headers": _cors_headers(),
         "body": json.dumps(payload),
     }
 
 
+def _method_from_event(event: dict) -> str:
+    http = event.get("requestContext", {}).get("http", {})
+    return str(http.get("method") or event.get("httpMethod") or "POST").upper()
+
+
 def handler(event: dict, context: object) -> dict:
     try:
+        if isinstance(event, dict) and _method_from_event(event) == "OPTIONS":
+            return {"statusCode": 204, "headers": _cors_headers(), "body": ""}
+
         _load_artifacts()
         records = _records_from_event(event)
         predictions = _predict(records)
