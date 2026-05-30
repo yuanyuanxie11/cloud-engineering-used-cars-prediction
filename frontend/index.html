@@ -419,22 +419,22 @@
               </label>
               <label>
                 State
-                <select name="state">
-                  <option>ca</option>
-                  <option>ny</option>
-                  <option>tx</option>
-                  <option>fl</option>
-                  <option>wa</option>
-                  <option>il</option>
-                  <option>az</option>
-                  <option>co</option>
-                  <option>ga</option>
-                  <option>nc</option>
-                  <option>oh</option>
-                  <option>mi</option>
-                  <option>pa</option>
-                  <option>or</option>
-                  <option>va</option>
+                <select name="state" id="stateSelect">
+                  <option value="ca">CA</option>
+                  <option value="ny">NY</option>
+                  <option value="tx">TX</option>
+                  <option value="fl">FL</option>
+                  <option value="wa">WA</option>
+                  <option value="il">IL</option>
+                  <option value="az">AZ</option>
+                  <option value="co">CO</option>
+                  <option value="ga">GA</option>
+                  <option value="nc">NC</option>
+                  <option value="oh">OH</option>
+                  <option value="mi">MI</option>
+                  <option value="pa">PA</option>
+                  <option value="or">OR</option>
+                  <option value="va">VA</option>
                 </select>
               </label>
               <label>
@@ -450,24 +450,7 @@
               </label>
               <label>
                 Region
-                <select name="region">
-                  <option>los angeles</option>
-                  <option>new york city</option>
-                  <option>dallas / fort worth</option>
-                  <option>houston</option>
-                  <option>miami / dade</option>
-                  <option>seattle-tacoma</option>
-                  <option>chicago</option>
-                  <option>phoenix</option>
-                  <option>denver</option>
-                  <option>atlanta</option>
-                  <option>charlotte</option>
-                  <option>columbus</option>
-                  <option>detroit metro</option>
-                  <option>philadelphia</option>
-                  <option>portland</option>
-                  <option>washington, dc</option>
-                </select>
+                <select name="region" id="regionSelect"></select>
               </label>
             </div>
 
@@ -516,7 +499,26 @@
       const button = document.querySelector("#predictButton");
       const resetButton = document.querySelector("#resetButton");
       const message = document.querySelector("#message");
+      const stateSelect = document.querySelector("#stateSelect");
+      const regionSelect = document.querySelector("#regionSelect");
       const apiEndpoint = "https://qodruw90xj.execute-api.us-east-1.amazonaws.com/predict";
+      const regionsByState = {
+        ca: ["los angeles", "san diego", "san francisco bay area", "sacramento"],
+        ny: ["new york city", "long island", "hudson valley", "buffalo"],
+        tx: ["dallas / fort worth", "houston", "austin", "san antonio"],
+        fl: ["miami / dade", "orlando", "tampa bay area", "jacksonville"],
+        wa: ["seattle-tacoma", "spokane", "olympic peninsula"],
+        il: ["chicago", "central illinois", "springfield"],
+        az: ["phoenix", "tucson", "flagstaff / sedona"],
+        co: ["denver", "colorado springs", "fort collins / north CO"],
+        ga: ["atlanta", "savannah / hinesville", "augusta"],
+        nc: ["charlotte", "raleigh / durham / CH", "greensboro"],
+        oh: ["columbus", "cleveland", "cincinnati"],
+        mi: ["detroit metro", "grand rapids", "lansing"],
+        pa: ["philadelphia", "pittsburgh", "harrisburg"],
+        or: ["portland", "eugene", "bend"],
+        va: ["washington, dc", "richmond", "norfolk / hampton roads"],
+      };
 
       function setMessage(text, kind = "warn") {
         message.textContent = text;
@@ -552,6 +554,20 @@
           const field = form.elements[key];
           if (field) field.value = value;
         }
+        populateRegions(sample.state, sample.region);
+      }
+
+      function populateRegions(state, selectedRegion) {
+        const regions = regionsByState[state] || [];
+        regionSelect.replaceChildren(
+          ...regions.map((region) => {
+            const option = document.createElement("option");
+            option.value = region;
+            option.textContent = region;
+            return option;
+          }),
+        );
+        regionSelect.value = regions.includes(selectedRegion) ? selectedRegion : regions[0] || "";
       }
 
       function renderResponse(body, httpStatus) {
@@ -618,6 +634,8 @@
       });
 
       resetButton.addEventListener("click", fillSample);
+      stateSelect.addEventListener("change", () => populateRegions(stateSelect.value));
+      populateRegions(sample.state, sample.region);
       fillSample();
     </script>
   </body>
