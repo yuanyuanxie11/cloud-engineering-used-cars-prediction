@@ -119,6 +119,13 @@
         gap: 14px;
       }
 
+      .sample-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
       label {
         display: grid;
         gap: 6px;
@@ -282,7 +289,8 @@
         }
 
         .layout,
-        .grid {
+        .grid,
+        .sample-row {
           grid-template-columns: 1fr;
         }
 
@@ -314,6 +322,17 @@
         <section class="form-panel" aria-labelledby="formTitle">
           <h2 id="formTitle">Vehicle Details</h2>
           <form id="predictForm">
+            <div class="sample-row">
+              <label>
+                Demo sample
+                <select id="sampleSelect">
+                  <option value="toyota_camry">Toyota sedan, CA</option>
+                  <option value="honda_suv">Honda SUV, WA</option>
+                  <option value="ford_truck">Ford truck, TX</option>
+                </select>
+              </label>
+              <button class="ghost" id="loadSampleButton" type="button">Load Sample</button>
+            </div>
             <div class="grid">
               <label>
                 Manufacturer
@@ -479,25 +498,59 @@
     </main>
 
     <script>
-      const sample = {
-        manufacturer: "toyota",
-        year: 2018,
-        odometer: 45000,
-        condition: "excellent",
-        cylinders: "4 cylinders",
-        fuel: "gas",
-        transmission: "automatic",
-        drive: "fwd",
-        type: "sedan",
-        paint_color: "white",
-        state: "ca",
-        title_status: "clean",
-        region: "los angeles",
+      const samples = {
+        toyota_camry: {
+          manufacturer: "toyota",
+          year: 2018,
+          odometer: 45000,
+          condition: "excellent",
+          cylinders: "4 cylinders",
+          fuel: "gas",
+          transmission: "automatic",
+          drive: "fwd",
+          type: "sedan",
+          paint_color: "white",
+          state: "ca",
+          title_status: "clean",
+          region: "los angeles",
+        },
+        honda_suv: {
+          manufacturer: "honda",
+          year: 2020,
+          odometer: 52000,
+          condition: "good",
+          cylinders: "4 cylinders",
+          fuel: "gas",
+          transmission: "automatic",
+          drive: "4wd",
+          type: "SUV",
+          paint_color: "silver",
+          state: "wa",
+          title_status: "clean",
+          region: "seattle-tacoma",
+        },
+        ford_truck: {
+          manufacturer: "ford",
+          year: 2017,
+          odometer: 82000,
+          condition: "good",
+          cylinders: "8 cylinders",
+          fuel: "gas",
+          transmission: "automatic",
+          drive: "4wd",
+          type: "truck",
+          paint_color: "black",
+          state: "tx",
+          title_status: "clean",
+          region: "dallas / fort worth",
+        },
       };
 
       const form = document.querySelector("#predictForm");
       const button = document.querySelector("#predictButton");
       const resetButton = document.querySelector("#resetButton");
+      const sampleSelect = document.querySelector("#sampleSelect");
+      const loadSampleButton = document.querySelector("#loadSampleButton");
       const message = document.querySelector("#message");
       const stateSelect = document.querySelector("#stateSelect");
       const regionSelect = document.querySelector("#regionSelect");
@@ -549,7 +602,8 @@
         };
       }
 
-      function fillSample() {
+      function fillSample(sampleKey = sampleSelect.value) {
+        const sample = samples[sampleKey] || samples.toyota_camry;
         for (const [key, value] of Object.entries(sample)) {
           const field = form.elements[key];
           if (field) field.value = value;
@@ -634,8 +688,9 @@
       });
 
       resetButton.addEventListener("click", fillSample);
+      loadSampleButton.addEventListener("click", () => fillSample());
       stateSelect.addEventListener("change", () => populateRegions(stateSelect.value));
-      populateRegions(sample.state, sample.region);
+      populateRegions(samples.toyota_camry.state, samples.toyota_camry.region);
       fillSample();
     </script>
   </body>
