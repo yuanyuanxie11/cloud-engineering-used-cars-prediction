@@ -29,7 +29,17 @@ aws ecr get-login-password --region "${REGION}" | \
 
 IMAGE_URI="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com/${REPO_NAME}:${IMAGE_TAG}"
 
-docker build --platform linux/amd64 -f serving/Dockerfile -t "${REPO_NAME}:${IMAGE_TAG}" .
+# Use buildx with --provenance=false so the pushed image stays in the
+# Docker V2 Schema 2 manifest format. Modern Docker (24+) defaults to
+# OCI manifests with a provenance attestation, which AWS Lambda's
+# container support currently rejects with:
+#   "The image manifest, config or layer media type ... is not supported."
+docker buildx build \
+  --platform linux/amd64 \
+  --provenance=false \
+  --load \
+  -f serving/Dockerfile \
+  -t "${REPO_NAME}:${IMAGE_TAG}" .
 docker tag "${REPO_NAME}:${IMAGE_TAG}" "${IMAGE_URI}"
 docker push "${IMAGE_URI}"
 
