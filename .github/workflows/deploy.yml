@@ -98,6 +98,35 @@ jobs:
             --function-name "${LAMBDA_FUNCTION}" \
             --region "${AWS_REGION}"
 
+      - name: Pre-warm Lambda (direct invoke, bypasses API Gateway's 30s timeout)
+        # After update-function-code the container is fresh: image pull + model
+        # load from S3 + xgboost init can take ~30s. API Gateway's HTTP API has
+        # a hard 30s integration timeout, so the first request through it after
+        # a deploy reliably returns 503. Direct lambda:Invoke uses the function's
+        # own 60s timeout, so we burn the cold start here. The next call through
+        # API Gateway lands on a warm container and is fast.
+        run: |
+          set -euo pipefail
+          aws lambda invoke \
+            --function-name "${LAMBDA_FUNCTION}" \
+            --region "${AWS_REGION}" \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{"instances":[{"manufacturer":"toyota","year":2018,"odometer":45000,"condition":"excellent","cylinders":"4 cylinders","fuel":"gas","transmission":"automatic","drive":"fwd","type":"sedan","paint_color":"white","state":"ca","title_status":"clean","region":"los angeles"}]}' \
+            --no-cli-pager \
+            /tmp/warmup-response.json >/tmp/warmup-meta.json
+          echo "--- Invoke metadata ---"
+          cat /tmp/warmup-meta.json
+          echo ""
+          echo "--- Function response ---"
+          cat /tmp/warmup-response.json
+          echo ""
+          # The function response is the dict our handler returns; the body
+          # field is a JSON string. We just need any signal that it worked.
+          grep -q '"predictions"' /tmp/warmup-response.json || {
+            echo "::error::Pre-warm did not return predictions"
+            exit 1
+          }
+
       - name: Smoke test the live /predict endpoint
         run: |
           set -euo pipefail
