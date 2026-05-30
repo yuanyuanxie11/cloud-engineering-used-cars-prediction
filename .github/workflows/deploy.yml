@@ -120,9 +120,14 @@ jobs:
           echo "--- Function response ---"
           cat /tmp/warmup-response.json
           echo ""
-          # The function response is the dict our handler returns; the body
-          # field is a JSON string. We just need any signal that it worked.
-          grep -q '"predictions"' /tmp/warmup-response.json || {
+          # aws lambda invoke writes the raw function-return dict to the file
+          # ({"statusCode":...,"headers":...,"body":"..."}). The "body" value
+          # is JSON-encoded — its quotes are backslash-escaped inside the
+          # outer JSON — so a grep for "predictions" (real quotes) would miss
+          # it. The smoke test below goes through API Gateway, which unwraps
+          # the body for us; it can keep the strict quoted match. Here we
+          # just need any signal that the model produced a number.
+          grep -q 'predictions' /tmp/warmup-response.json || {
             echo "::error::Pre-warm did not return predictions"
             exit 1
           }
