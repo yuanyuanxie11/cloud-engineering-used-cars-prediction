@@ -195,17 +195,72 @@ credential is blocked at PR time.
 
 ## Cost architecture
 
-> _Filled out in Phase 4 — AWS Pricing Calculator estimate goes here._
+> **Headline:** ~**$2.13 / month** for the full system at demo traffic. Full
+> 12-month projection: **$25.56**. See [`cost_estimate.pdf`](cost_estimate.pdf)
+> for the AWS Pricing Calculator export.
 
-Placeholder structure:
+### Monthly cost by service
 
-- Monthly cost by service (S3, Lambda × 2, API Gateway, ECR, CloudWatch, EC2 one-shot)
-- Cost-driving decisions:
-  - **Lambda + API Gateway HTTP API** over ECS Fargate + ALB (idle cost: $0 vs ~$25/mo)
-  - **HTTP API** over REST API (per-call: $1.00 vs $3.50 per million — 70% saved)
-  - **EC2 terminate-after-training** over always-on (training is a one-shot job)
-  - **Lambda 2048 MB** over 1024 MB (faster cold start, similar total cost because duration ≈ halved)
-- Anticipated demo-day cost: TBD (estimated < $1 for the full demo)
+| Service | Monthly | Tier | Why this number |
+|---------|--------:|------|-----------------|
+| Amazon CloudWatch | $1.39 | 🟢 always-billed | 4 custom metrics + 0.1 GB log ingestion + 1 alarm |
+| Amazon ECR | $0.40 | 🟢 always-billed | ~4 GB image storage (`*-clean` + `*-serving` repos combined) |
+| Amazon EC2 (t3.xlarge) | $0.33 | 🔴 one-shot | **2 hours** of training per month, not 730 |
+| Amazon S3 | $0.01 | 🟢 always-billed | ~300 MB data lake (raw + processed + model artifacts) |
+| AWS Lambda (predict) | <$0.01 | 🟡 pay-per-use | 100 req × 1 s × 2 GB ≈ 200 GB-seconds |
+| AWS Lambda (clean) | <$0.01 | 🟡 pay-per-use | 10 req × 30 s × 1 GB ≈ 300 GB-seconds |
+| Amazon API Gateway (HTTP API) | <$0.01 | 🟡 pay-per-use | 100 requests / month |
+| **Total** | **$2.13** | | |
+
+🟢 Always-billed totals **$1.80/month** — that's the floor cost even if
+nobody invokes the API and nobody runs training. 🟡 Pay-per-use components
+scale to **literally $0** when idle.
+
+### Cost-driving decisions (the savings narrative)
+
+The interesting number is not the total — it's **what we deliberately did
+not pay for**. Compared to a naive "always-on container" architecture, our
+serverless + on-demand design saves ~$167/month at this scale.
+
+| Decision | We chose | "Naive default" alternative | Monthly delta |
+|----------|----------|------------------------------|--------------:|
+| Inference layer | Lambda + API Gateway HTTP API (scale-to-zero) | ECS Fargate (1 vCPU, 2 GB, 24/7) + ALB | **+$48** |
+| Training compute | EC2 t3.xlarge, terminate when done (2 hr) | EC2 t3.xlarge running 24/7 (730 hr) | **+$121** |
+| API style | HTTP API ($1.00 / 1M requests) | REST API ($3.50 / 1M requests) | +$2.50 at 1M req/mo |
+| Lambda memory | 2048 MB (algo: more CPU → faster cold start) | 1024 MB | ~$0 (GB-seconds product unchanged) |
+| ECR scanning | Basic (free, OS-level CVE) | Enhanced (Amazon Inspector) | +$0.09 / image scan |
+| **Headline savings vs naive 24/7 stack** | | | **~$167/month (98.7%)** |
+
+This is the slide for the Phase 6 deck: *"$2 / month is not luck — it's the
+sum of six explicit architectural choices."*
+
+### What changes at production scale
+
+The architecture would survive a 10,000× traffic increase with predictable cost
+behavior because every pay-per-use line scales linearly:
+
+| Traffic | API Gateway | Lambda predict | CloudWatch logs | Total |
+|--------:|------------:|---------------:|----------------:|------:|
+| 100 req/mo (demo) | <$0.01 | <$0.01 | $0.05 | **$2.13** |
+| 100K req/mo | $0.10 | $0.33 | ~$1 | ~$4 |
+| 1M req/mo | $1.00 | $3.30 | ~$8 | ~$15 |
+| 10M req/mo | $10 | $33 | ~$50 | ~$95 |
+
+The 🟢 always-billed floor (ECR + S3 + CloudWatch metrics ≈ $1.80) is
+**independent of traffic** — so the *marginal* cost of each additional
+prediction is essentially the Lambda + API Gateway add-on. No surprise
+bills, no provisioning required.
+
+### Cost controls in place
+
+- **Pricing alarm:** _(TODO Phase 5 — add a CloudWatch Billing alarm at $10/mo
+  threshold so any cost anomaly pages the team.)_
+- **EC2 hygiene:** training instances are terminated, not stopped — no
+  hidden EBS root-volume costs.
+- **ECR lifecycle:** _(future)_ keep only the latest 5 image tags to bound
+  storage growth.
+- **CloudWatch Logs retention:** _(future)_ set to 14 days to prevent
+  unbounded log storage growth.
 
 ---
 
