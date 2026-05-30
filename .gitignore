@@ -19,3 +19,36 @@ metrics.json
 
 # OS / editor
 .DS_Store
+.vscode/
+.idea/
+
+Project.pdf
+
+# === Secrets & credentials (NEVER commit) ===
+# Env files often hold API keys, DB passwords, etc.
+.env
+.env.*
+*.env
+
+# AWS CLI credentials and config
+.aws/
+credentials
+
+# SSH / TLS private keys
+*.pem
+*.key
+*.crt
+*.p12
+
+# Terraform state files contain plaintext secrets
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Generic secret-ish files
+secrets/
+*.secret
+*_secret*
+
+# Logs may accidentally leak tokens
+*.log
