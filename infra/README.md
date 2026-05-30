@@ -306,16 +306,37 @@ The first invocation per cold container loads the model from S3 and can take
 ~25–30 seconds. Before the live demo, fire one curl 30 seconds beforehand so
 the model is cached in memory and the demo call returns in < 1 second.
 
-### CI/CD (Phase 5, planned)
+### CI/CD via GitHub Actions
 
-GitHub Actions workflow at `.github/workflows/deploy.yml`:
+Workflow: [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml).
+Trigger: `push` to `main` (or `eason` while the workflow is being proven), but
+only when files under `serving/`, `modeling/`, `config.yaml`, or the workflow
+itself change.
 
-- Trigger: `push` to `main`, only when files under `serving/` or `modeling/` change
-- Steps:
-  1. Configure AWS credentials via OIDC (`aws-actions/configure-aws-credentials` with `role-to-assume`) — **no AWS_ACCESS_KEY_ID stored as GitHub secret**
-  2. Build + push the image (reuses `serving/deploy.sh`)
-  3. `aws lambda update-function-code --function-name mlds423-predict --image-uri ...`
-  4. Optional: post-deploy smoke test (the curl above) and fail the build if HTTP != 200
+Per-run flow:
+
+1. **OIDC token exchange** — the workflow assumes `UsedCarsMLGitHubDeployRole`
+   via GitHub's OIDC provider. No `AWS_ACCESS_KEY_ID` is stored as a GitHub
+   secret. The role's trust policy
+   ([`iam_github_trust_policy.json`](iam_github_trust_policy.json)) restricts
+   `sts:AssumeRoleWithWebIdentity` to subjects matching
+   `repo:yuanyuanxie11/cloud-engineering-used-cars-prediction:*`. Permissions
+   ([`iam_github_deploy_policy.json`](iam_github_deploy_policy.json)) are
+   limited to the serving ECR repository and the predict Lambda only — the CI
+   role cannot touch any other resource.
+2. **Build + push** with `docker buildx --platform linux/amd64 --provenance=false`,
+   tagging the image as both `:latest` (what Lambda points to) and
+   `:<git-sha>` (immutable audit/rollback handle).
+3. **`aws lambda update-function-code`** followed by `aws lambda wait
+   function-updated` so the next step never hits a stale image.
+4. **Live smoke test** — POSTs a known sample to the public `/predict` endpoint
+   and fails the workflow unless the response is HTTP 200 with a `predictions`
+   key. This is the "Continuous **Deployment**" gate: green only when the model
+   is verifiably serving in production.
+
+This is the same zero-static-secrets philosophy as the runtime (SSO for humans,
+IAM Roles for services) extended into the build pipeline: **no long-lived AWS
+credentials exist anywhere in this project**.
 
 ### Teardown (cost control after demo)
 

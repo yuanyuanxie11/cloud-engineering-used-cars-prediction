@@ -1,0 +1,129 @@
+name: Deploy inference Lambda
+
+# ============================================================================
+# Build the serving container image, push to ECR, update the predict Lambda,
+# and smoke-test the API. No long-lived AWS credentials anywhere — the job
+# assumes UsedCarsMLGitHubDeployRole via GitHub's OIDC provider on every run.
+# See infra/iam_github_trust_policy.json + infra/iam_github_deploy_policy.json
+# for the AWS side of this trust.
+# ============================================================================
+
+on:
+  push:
+    branches:
+      - main
+      - eason   # remove once the workflow is proven; main-only after Phase 5.3 passes
+    paths:
+      - 'serving/**'
+      - 'modeling/**'
+      - 'config.yaml'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:   # allow manual runs from the Actions tab
+
+# Required for the OIDC token exchange. Without `id-token: write`,
+# aws-actions/configure-aws-credentials cannot mint AWS creds.
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: "031976263011"
+  AWS_DEPLOY_ROLE: arn:aws:iam::031976263011:role/UsedCarsMLGitHubDeployRole
+  ECR_REPOSITORY: mlds423-used-cars-serving
+  LAMBDA_FUNCTION: mlds423-predict
+  # Public /predict endpoint used for the post-deploy smoke test.
+  # Lives here for now; promote to `vars.API_BASE_URL` once the repo has it.
+  API_BASE_URL: https://qodruw90xj.execute-api.us-east-1.amazonaws.com
+
+jobs:
+  deploy:
+    name: Build → Push ECR → Update Lambda → Smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC, no static keys)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-${{ github.run_id }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image to ECR
+        id: build
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          GIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI_LATEST="${REGISTRY}/${ECR_REPOSITORY}:latest"
+          IMAGE_URI_SHA="${REGISTRY}/${ECR_REPOSITORY}:${GIT_SHA::7}"
+
+          # --provenance=false + --platform linux/amd64 match the local
+          # serving/deploy.sh; same Mac-on-Lambda gotcha applies in CI.
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --push \
+            -f serving/Dockerfile \
+            -t "${IMAGE_URI_LATEST}" \
+            -t "${IMAGE_URI_SHA}" \
+            .
+
+          echo "image_uri=${IMAGE_URI_LATEST}" >> "$GITHUB_OUTPUT"
+          echo "image_sha=${GIT_SHA::7}"      >> "$GITHUB_OUTPUT"
+          echo "::notice title=Image pushed::${IMAGE_URI_SHA}"
+
+      - name: Update Lambda function code
+        run: |
+          aws lambda update-function-code \
+            --function-name "${LAMBDA_FUNCTION}" \
+            --image-uri "${{ steps.build.outputs.image_uri }}" \
+            --region "${AWS_REGION}" \
+            --no-cli-pager
+
+      - name: Wait for Lambda to finish updating
+        run: |
+          aws lambda wait function-updated \
+            --function-name "${LAMBDA_FUNCTION}" \
+            --region "${AWS_REGION}"
+
+      - name: Smoke test the live /predict endpoint
+        run: |
+          set -euo pipefail
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "${API_BASE_URL}/predict" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "instances": [{
+                "manufacturer": "toyota", "year": 2018, "odometer": 45000,
+                "condition": "excellent", "cylinders": "4 cylinders",
+                "fuel": "gas", "transmission": "automatic", "drive": "fwd",
+                "type": "sedan", "paint_color": "white", "state": "ca",
+                "title_status": "clean", "region": "los angeles"
+              }]
+            }')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          echo "HTTP status: $HTTP_CODE"
+          echo "Body: $BODY"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error title=Smoke test failed::API returned $HTTP_CODE"
+            exit 1
+          fi
+          # Assert the body actually contains a "predictions" key.
+          echo "$BODY" | grep -q '"predictions"' || {
+            echo "::error::Response missing 'predictions' key"
+            exit 1
+          }
+          echo "::notice title=Smoke test passed::Predictions returned for sample input"
