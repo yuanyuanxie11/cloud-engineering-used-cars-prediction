@@ -9,6 +9,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,6 +40,12 @@ def main() -> int:
     parser.add_argument("--rows", type=int, default=8000)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
+    logger = logging.getLogger("make_sample_parquet")
 
     rng = np.random.default_rng(args.seed)
     n = args.rows
@@ -75,7 +82,7 @@ def main() -> int:
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, index=False)
-    print(f"Wrote {len(df):,} rows to {out}")
+    logger.info(f"Wrote {len(df):,} rows to {out}")
     return 0
 
 

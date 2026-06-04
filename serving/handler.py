@@ -41,7 +41,6 @@ import boto3
 import numpy as np
 import pandas as pd
 import yaml
-
 from modeling.features import prepare_xy
 from modeling.train import prepare_xgb_native_frame
 
@@ -50,9 +49,7 @@ logger.setLevel(logging.INFO)
 
 BUCKET = os.environ.get("USED_CARS_BUCKET", "mlds423-used-cars-project")
 MODEL_KEY = os.environ.get("MODEL_KEY", "artifacts/models/latest/best_model.pkl")
-MANIFEST_KEY = os.environ.get(
-    "MANIFEST_KEY", "artifacts/models/latest/model_manifest.json"
-)
+MANIFEST_KEY = os.environ.get("MANIFEST_KEY", "artifacts/models/latest/model_manifest.json")
 CONFIG_PATH = os.environ.get("CONFIG_PATH", "config.yaml")
 
 _s3 = boto3.client("s3")

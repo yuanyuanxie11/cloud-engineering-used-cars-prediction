@@ -19,8 +19,10 @@ metrics.json
 
 # OS / editor
 .DS_Store
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
+.ruff_cache/
 
 Project.pdf
 

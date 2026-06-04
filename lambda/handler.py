@@ -14,11 +14,10 @@ import tempfile
 from datetime import datetime, timezone
 from urllib.parse import unquote_plus
 
-from pipeline.clean import clean_vehicles
-from pipeline.config import ARTIFACTS_PREFIX, PROCESSED_PREFIX
-
 import boto3
 import pandas as pd
+from pipeline.clean import clean_vehicles
+from pipeline.config import ARTIFACTS_PREFIX, PROCESSED_PREFIX
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)

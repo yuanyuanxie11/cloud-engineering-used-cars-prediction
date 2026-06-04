@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib  # noqa: E402
+
 matplotlib.use("Agg")  # noqa: E402 — must be set before pyplot import
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
@@ -47,6 +48,7 @@ sns.set_theme(style="whitegrid")
 # I/O helpers
 # ---------------------------------------------------------------------------
 
+
 def load_config(path: str) -> dict[str, Any]:
     """Load YAML config with optional env-var overrides."""
     with open(path, encoding="utf-8") as fh:
@@ -62,12 +64,11 @@ def read_data(cfg: dict[str, Any], local_input: str | None) -> pd.DataFrame:
         logger.info("Reading local file: %s", local_input)
         return pd.read_parquet(local_input)
     import boto3
+
     bucket = cfg["aws"]["bucket"]
     key = cfg["aws"]["processed_key"]
     logger.info("Reading s3://%s/%s", bucket, key)
-    obj = boto3.client("s3", region_name=cfg["aws"]["region"]).get_object(
-        Bucket=bucket, Key=key
-    )
+    obj = boto3.client("s3", region_name=cfg["aws"]["region"]).get_object(Bucket=bucket, Key=key)
     return pd.read_parquet(io.BytesIO(obj["Body"].read()))
 
 
@@ -89,6 +90,7 @@ def _save_fig(
         logger.info("Saved %s", out_path)
     else:
         import boto3
+
         bucket = cfg["aws"]["bucket"]
         key = f"artifacts/eda/{filename}"
         boto3.client("s3", region_name=cfg["aws"]["region"]).put_object(
@@ -113,6 +115,7 @@ def _save_json(
         logger.info("Saved %s", out_path)
     else:
         import boto3
+
         bucket = cfg["aws"]["bucket"]
         key = f"artifacts/eda/{filename}"
         boto3.client("s3", region_name=cfg["aws"]["region"]).put_object(
@@ -124,6 +127,7 @@ def _save_json(
 # ---------------------------------------------------------------------------
 # EDA plots
 # ---------------------------------------------------------------------------
+
 
 def plot_price_distribution(
     df: pd.DataFrame, local_output: str | None, cfg: dict[str, Any]
@@ -158,11 +162,7 @@ def plot_price_by_category(
         return
 
     order = (
-        df.groupby(col)["price"]
-        .median()
-        .sort_values(ascending=False)
-        .head(top_n)
-        .index.tolist()
+        df.groupby(col)["price"].median().sort_values(ascending=False).head(top_n).index.tolist()
     )
 
     fig, ax = plt.subplots(figsize=(12, 5))
@@ -175,16 +175,12 @@ def plot_price_by_category(
     _save_fig(fig, f"price_by_{col}.png", local_output, cfg)
 
 
-def plot_odometer_vs_price(
-    df: pd.DataFrame, local_output: str | None, cfg: dict[str, Any]
-) -> None:
+def plot_odometer_vs_price(df: pd.DataFrame, local_output: str | None, cfg: dict[str, Any]) -> None:
     """Scatter: odometer vs price (sampled for speed)."""
     if "odometer" not in df.columns:
         return
 
-    sample = df[["odometer", "price"]].dropna().sample(
-        min(10_000, len(df)), random_state=42
-    )
+    sample = df[["odometer", "price"]].dropna().sample(min(10_000, len(df)), random_state=42)
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.scatter(sample["odometer"], sample["price"], alpha=0.15, s=5, color="teal")
     ax.set_xlabel("Odometer (miles)")
@@ -202,14 +198,13 @@ def plot_vehicle_age_vs_price(
         return
 
     from datetime import datetime, timezone
+
     current_year = datetime.now(timezone.utc).year
     tmp = df.copy()
     tmp["vehicle_age"] = current_year - tmp["year"]
     tmp = tmp[(tmp["vehicle_age"] >= 0) & (tmp["vehicle_age"] <= 40)]
     age_labels = ["0–3", "4–7", "8–12", "13–20", "21+"]
-    tmp["age_bucket"] = pd.cut(
-        tmp["vehicle_age"], bins=[0, 3, 7, 12, 20, 40], labels=age_labels
-    )
+    tmp["age_bucket"] = pd.cut(tmp["vehicle_age"], bins=[0, 3, 7, 12, 20, 40], labels=age_labels)
 
     fig, ax = plt.subplots(figsize=(10, 5))
     sns.boxplot(
@@ -225,9 +220,7 @@ def plot_vehicle_age_vs_price(
     _save_fig(fig, "vehicle_age_vs_price.png", local_output, cfg)
 
 
-def plot_missing_values(
-    df: pd.DataFrame, local_output: str | None, cfg: dict[str, Any]
-) -> None:
+def plot_missing_values(df: pd.DataFrame, local_output: str | None, cfg: dict[str, Any]) -> None:
     """Horizontal bar chart of missing-value percentages."""
     pct_missing = (df.isnull().mean() * 100).sort_values(ascending=False)
     pct_missing = pct_missing[pct_missing > 0]
@@ -280,9 +273,7 @@ def compute_summary_stats(df: pd.DataFrame) -> dict[str, Any]:
             "p75": round(float(price.quantile(0.75)), 2),
         },
         "missing_pct": {
-            col: round(float(pct), 4)
-            for col, pct in (df.isnull().mean() * 100).items()
-            if pct > 0
+            col: round(float(pct), 4) for col, pct in (df.isnull().mean() * 100).items() if pct > 0
         },
         "top_manufacturers": (
             df["manufacturer"].value_counts().head(10).to_dict()
@@ -296,6 +287,7 @@ def compute_summary_stats(df: pd.DataFrame) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="EDA for used-cars dataset")

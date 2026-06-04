@@ -53,6 +53,7 @@ logger = logging.getLogger(__name__)
 # Config helpers
 # ---------------------------------------------------------------------------
 
+
 def load_config(path: str) -> dict[str, Any]:
     """Load YAML config; env vars can override aws.bucket and run_id."""
     with open(path, encoding="utf-8") as fh:
@@ -86,9 +87,7 @@ def config_hash(cfg: dict[str, Any]) -> str:
         "features": cfg.get("features"),
         "training": cfg.get("training"),
     }
-    digest = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, default=str).encode()
-    ).hexdigest()
+    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
     return digest[:12]
 
 
@@ -121,9 +120,7 @@ def artifact_keys(cfg: dict[str, Any], run_id: str) -> dict[str, str]:
         "legacy_xgboost_native": art.get(
             "legacy_native_challenger_key", "artifacts/models/xgboost_native.pkl"
         ),
-        "legacy_best_model": art.get(
-            "legacy_best_model_key", "artifacts/models/best_model.pkl"
-        ),
+        "legacy_best_model": art.get("legacy_best_model_key", "artifacts/models/best_model.pkl"),
         "legacy_metrics": art["legacy_metrics_key"],
         "legacy_manifest": art["legacy_manifest_key"],
         "legacy_feature_importance": art["legacy_importance_key"],
@@ -150,8 +147,10 @@ def make_cv(cfg: dict[str, Any]) -> KFold:
 # S3 helpers
 # ---------------------------------------------------------------------------
 
+
 def _s3_client(cfg: dict[str, Any]):
     import boto3
+
     return boto3.client("s3", region_name=cfg["aws"]["region"])
 
 
@@ -178,9 +177,19 @@ def push_cloudwatch_metrics(
             Namespace=namespace,
             MetricData=[
                 {"MetricName": "TestR2", "Value": test["r2"], "Unit": "None", "Dimensions": dims},
-                {"MetricName": "TestRMSE", "Value": test["rmse"], "Unit": "None", "Dimensions": dims},
+                {
+                    "MetricName": "TestRMSE",
+                    "Value": test["rmse"],
+                    "Unit": "None",
+                    "Dimensions": dims,
+                },
                 {"MetricName": "TestMAE", "Value": test["mae"], "Unit": "None", "Dimensions": dims},
-                {"MetricName": "CVR2Mean", "Value": best_metrics["cv_r2_mean"], "Unit": "None", "Dimensions": dims},
+                {
+                    "MetricName": "CVR2Mean",
+                    "Value": best_metrics["cv_r2_mean"],
+                    "Unit": "None",
+                    "Dimensions": dims,
+                },
             ],
         )
         logger.info("Published CloudWatch metrics to namespace %s (run_id=%s)", namespace, run_id)
@@ -203,9 +212,7 @@ def read_parquet_from_s3(cfg: dict[str, Any]) -> pd.DataFrame:
 
 def upload_bytes(cfg: dict[str, Any], key: str, data: bytes, content_type: str) -> None:
     bucket = cfg["aws"]["bucket"]
-    _s3_client(cfg).put_object(
-        Bucket=bucket, Key=key, Body=data, ContentType=content_type
-    )
+    _s3_client(cfg).put_object(Bucket=bucket, Key=key, Body=data, ContentType=content_type)
     logger.info("Uploaded s3://%s/%s (%d bytes)", bucket, key, len(data))
 
 
@@ -232,13 +239,12 @@ def save_csv_to_s3(cfg: dict[str, Any], df: pd.DataFrame, key: str) -> None:
 # Metrics & targets
 # ---------------------------------------------------------------------------
 
+
 def compute_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
     mae = float(mean_absolute_error(y_true, y_pred))
     r2 = float(r2_score(y_true, y_pred))
-    mape = float(
-        np.mean(np.abs((y_true - y_pred) / np.clip(np.abs(y_true), 1, None))) * 100
-    )
+    mape = float(np.mean(np.abs((y_true - y_pred) / np.clip(np.abs(y_true), 1, None))) * 100)
     return {"rmse": rmse, "mae": mae, "r2": r2, "mape_pct": mape}
 
 
@@ -257,6 +263,7 @@ def inverse_transform_predictions(y_pred: np.ndarray, use_log: bool) -> np.ndarr
 # ---------------------------------------------------------------------------
 # Model pipelines
 # ---------------------------------------------------------------------------
+
 
 def build_ridge_pipeline(preprocessor: Any, cfg: dict[str, Any]) -> Pipeline:
     ridge_params = cfg["training"]["ridge"]
@@ -278,9 +285,7 @@ def build_xgb_pipeline(preprocessor: Any, cfg: dict[str, Any]) -> Pipeline:
 
     xgb_cfg = cfg["training"]["xgboost"]
     xgb_params = {
-        k: v
-        for k, v in xgb_cfg.items()
-        if k not in ("early_stopping_rounds", "validation_size")
+        k: v for k, v in xgb_cfg.items() if k not in ("early_stopping_rounds", "validation_size")
     }
     model = XGBRegressor(**xgb_params)
     return Pipeline(steps=[("preprocessor", preprocessor), ("model", model)])
@@ -315,19 +320,13 @@ def train_and_evaluate(
         scoring="r2",
         n_jobs=cv_n_jobs,
     )
-    logger.info(
-        "%s CV R² — mean: %.4f  std: %.4f", name, cv_scores.mean(), cv_scores.std()
-    )
+    logger.info("%s CV R² — mean: %.4f  std: %.4f", name, cv_scores.mean(), cv_scores.std())
 
     pipeline.fit(X_train, y_train, **(fit_kwargs or {}))
     elapsed = time.time() - t0
 
-    y_pred_train = inverse_transform_predictions(
-        pipeline.predict(X_train), use_log_target
-    )
-    y_pred_test = inverse_transform_predictions(
-        pipeline.predict(X_test), use_log_target
-    )
+    y_pred_train = inverse_transform_predictions(pipeline.predict(X_train), use_log_target)
+    y_pred_test = inverse_transform_predictions(pipeline.predict(X_test), use_log_target)
     y_train_orig = y_train.values if not use_log_target else np.expm1(y_train.values)
     y_test_orig = y_test.values if not use_log_target else np.expm1(y_test.values)
 
@@ -425,9 +424,7 @@ def train_xgboost(
         # early stopping is applied only to the final refit below.
         cv_n_jobs = cfg["training"].get("cv_n_jobs", 1)
         cv_scores = cross_val_score(
-            build_xgb_pipeline(
-                build_preprocessor(X_train, cfg)[0], cfg
-            ),
+            build_xgb_pipeline(build_preprocessor(X_train, cfg)[0], cfg),
             X_train,
             y_train,
             cv=make_cv(cfg),
@@ -444,15 +441,9 @@ def train_xgboost(
         fit_xgboost_with_early_stopping(pipeline, X_train, y_train, cfg)
         elapsed = time.time() - t0
 
-        y_pred_train = inverse_transform_predictions(
-            pipeline.predict(X_train), use_log_target
-        )
-        y_pred_test = inverse_transform_predictions(
-            pipeline.predict(X_test), use_log_target
-        )
-        y_train_orig = (
-            y_train.values if not use_log_target else np.expm1(y_train.values)
-        )
+        y_pred_train = inverse_transform_predictions(pipeline.predict(X_train), use_log_target)
+        y_pred_test = inverse_transform_predictions(pipeline.predict(X_test), use_log_target)
+        y_train_orig = y_train.values if not use_log_target else np.expm1(y_train.values)
         y_test_orig = y_test.values if not use_log_target else np.expm1(y_test.values)
 
         metrics = {
@@ -475,7 +466,13 @@ def train_xgboost(
         return metrics, pipeline
 
     return train_and_evaluate(
-        name, pipeline, X_train, y_train, X_test, y_test, cfg,
+        name,
+        pipeline,
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        cfg,
         use_log_target=use_log_target,
     )
 
@@ -486,7 +483,8 @@ def _native_xgb_columns(X: pd.DataFrame, cfg: dict[str, Any]) -> tuple[list[str]
     present = set(X.columns)
     numeric = [c for c in feat_cfg.get("numeric_features", []) if c in present]
     categorical = [
-        c for c in feat_cfg.get("native_xgboost_categorical_features", [])
+        c
+        for c in feat_cfg.get("native_xgboost_categorical_features", [])
         if c in present and c not in numeric
     ]
     return numeric, categorical
@@ -567,20 +565,14 @@ def train_xgboost_native(
         scoring="r2",
         n_jobs=cv_n_jobs,
     )
-    logger.info(
-        "%s CV R² — mean: %.4f  std: %.4f", name, cv_scores.mean(), cv_scores.std()
-    )
+    logger.info("%s CV R² — mean: %.4f  std: %.4f", name, cv_scores.mean(), cv_scores.std())
 
     model = build_xgb_native_model(cfg)
     model.fit(X_train_native, y_train)
     elapsed = time.time() - t0
 
-    y_pred_train = inverse_transform_predictions(
-        model.predict(X_train_native), use_log_target
-    )
-    y_pred_test = inverse_transform_predictions(
-        model.predict(X_test_native), use_log_target
-    )
+    y_pred_train = inverse_transform_predictions(model.predict(X_train_native), use_log_target)
+    y_pred_test = inverse_transform_predictions(model.predict(X_test_native), use_log_target)
     y_train_orig = y_train.values if not use_log_target else np.expm1(y_train.values)
     y_test_orig = y_test.values if not use_log_target else np.expm1(y_test.values)
 
@@ -620,9 +612,8 @@ def feature_importance_df(model_or_pipeline: Any, feature_names: list[str]) -> p
         logger.warning("Model has no importances; skipping export")
         return pd.DataFrame()
 
-    return (
-        pd.DataFrame({"feature": feature_names, "importance": importances})
-        .sort_values("importance", ascending=False)
+    return pd.DataFrame({"feature": feature_names, "importance": importances}).sort_values(
+        "importance", ascending=False
     )
 
 
@@ -652,9 +643,7 @@ def build_manifest(
         "native_xgboost_categorical_features": feat_cfg.get(
             "native_xgboost_categorical_features", []
         ),
-        "metrics_summary": {
-            m["model"]: m["test"] for m in all_metrics["models"]
-        },
+        "metrics_summary": {m["model"]: m["test"] for m in all_metrics["models"]},
         "inference_note": (
             "If best_model is Ridge/RandomForest/XGBoost, load best_model.pkl as a "
             "sklearn Pipeline and pass prepared X from prepare_xy. If best_model is "
@@ -760,6 +749,7 @@ def persist_artifacts(
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Train used-cars price models")
     parser.add_argument("--config", default="config.yaml")
@@ -856,15 +846,13 @@ def main(argv: list[str] | None = None) -> int:
     xgb_native_model: Any | None = None
     xgb_native_feature_names: list[str] = []
     if train_cfg.get("xgboost_native", {}).get("enabled", False):
-        xgb_native_metrics, xgb_native_model, xgb_native_feature_names = (
-            train_xgboost_native(
-                X_train,
-                y_train,
-                X_test,
-                y_test,
-                cfg,
-                use_log_target,
-            )
+        xgb_native_metrics, xgb_native_model, xgb_native_feature_names = train_xgboost_native(
+            X_train,
+            y_train,
+            X_test,
+            y_test,
+            cfg,
+            use_log_target,
         )
 
     candidates = {
@@ -913,9 +901,7 @@ def main(argv: list[str] | None = None) -> int:
             "config_hash": config_hash(cfg),
         },
     }
-    manifest = build_manifest(
-        cfg, run_id, best_name, all_metrics, list(X.columns), feat_names
-    )
+    manifest = build_manifest(cfg, run_id, best_name, all_metrics, list(X.columns), feat_names)
 
     local_out = Path(args.local_output) if args.local_output else None
     persist_artifacts(
