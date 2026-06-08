@@ -1,7 +1,9 @@
 import importlib
+import json
 import sys
 import types
 import unittest
+from unittest.mock import patch
 
 
 def load_handler_with_stubs():
@@ -59,6 +61,22 @@ class ServingHandlerTest(unittest.TestCase):
 
         self.assertEqual(response["headers"]["Content-Type"], "application/json")
         self.assertEqual(response["headers"]["Access-Control-Allow-Origin"], "*")
+
+    def test_empty_instances_returns_400(self):
+        handler = load_handler_with_stubs()
+        with patch.object(handler, "_load_artifacts"):
+            response = handler.handler({"body": '{"instances": []}'}, None)
+        self.assertEqual(response["statusCode"], 400)
+        body = json.loads(response["body"])
+        self.assertIn("error", body)
+
+    def test_invalid_json_returns_400(self):
+        handler = load_handler_with_stubs()
+        with patch.object(handler, "_load_artifacts"):
+            response = handler.handler({"body": "not-json"}, None)
+        self.assertEqual(response["statusCode"], 400)
+        body = json.loads(response["body"])
+        self.assertIn("error", body)
 
 
 if __name__ == "__main__":

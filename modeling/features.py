@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 # Raw feature construction
 # ---------------------------------------------------------------------------
 
+
 def engineer_features(df: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame:
     """
     Apply feature engineering steps that create new columns or transform
@@ -65,9 +66,7 @@ def engineer_features(df: pd.DataFrame, cfg: dict[str, Any]) -> pd.DataFrame:
     return df
 
 
-def prepare_xy(
-    df: pd.DataFrame, cfg: dict[str, Any]
-) -> tuple[pd.DataFrame, pd.Series]:
+def prepare_xy(df: pd.DataFrame, cfg: dict[str, Any]) -> tuple[pd.DataFrame, pd.Series]:
     """
     Apply feature engineering and split into X (features) and y (target).
     Rows where the target is null are dropped with a warning.
@@ -92,6 +91,7 @@ def prepare_xy(
 # ---------------------------------------------------------------------------
 # sklearn preprocessor
 # ---------------------------------------------------------------------------
+
 
 def _resolve_columns(X: pd.DataFrame, cfg: dict[str, Any]) -> dict[str, list[str]]:
     """

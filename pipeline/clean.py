@@ -62,8 +62,9 @@ def read_input(path: str | None, s3_uri: str | None) -> pd.DataFrame:
 
 def write_output(df: pd.DataFrame, path: str | None, s3_uri: str | None) -> None:
     if s3_uri:
-        import boto3
         from io import BytesIO
+
+        import boto3
 
         bucket, key = _parse_s3_uri(s3_uri)
         buffer = BytesIO()

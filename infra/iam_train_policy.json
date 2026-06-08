@@ -27,6 +27,17 @@
       "Effect": "Allow",
       "Action": ["cloudwatch:PutMetricData"],
       "Resource": "*"
+    },
+    {
+      "Sid": "WriteEc2TrainingLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents",
+        "logs:DescribeLogStreams"
+      ],
+      "Resource": "arn:aws:logs:us-east-1:031976263011:log-group:/used-cars/ec2-train:*"
     }
   ]
 }

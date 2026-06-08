@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 
 # S3 layout (override via env for local testing)
 DEFAULT_BUCKET = os.environ.get("USED_CARS_BUCKET", "used-cars-project")

@@ -6,7 +6,7 @@ Use this when running [`ec2_train.sh`](ec2_train.sh) for the Week 9 demo.
 
 - [ ] S3 bucket `mlds423-used-cars-project` (or your team name) exists
 - [ ] `s3://<bucket>/processed/vehicles_clean.parquet` uploaded by Person 1
-- [ ] IAM role attached to EC2 with `GetObject` on `processed/*` and `PutObject` on `artifacts/*`
+- [ ] IAM role attached to EC2 (`UsedCarsMLTrainRole` / profile) with policy in [`iam_train_policy.json`](iam_train_policy.json) — S3 + `PutMetricData` + **logs on `/used-cars/ec2-train`**
 
 ## Launch
 
@@ -32,6 +32,12 @@ Or clone the repo and run `infra/ec2_train.sh` after SSH.
 aws s3 ls s3://mlds423-used-cars-project/artifacts/models/latest/
 aws s3 cp s3://mlds423-used-cars-project/artifacts/models/latest/metrics.json -
 tail -50 /var/log/train.log
+```
+
+CloudWatch Logs (after training starts, **us-east-1**):
+
+```bash
+aws logs tail /used-cars/ec2-train --follow --region us-east-1
 ```
 
 Expected keys: `best_model.pkl`, `model_manifest.json`, `metrics.json`, `ridge.pkl`, `random_forest.pkl`, `xgboost.pkl`, `xgboost_native.pkl`
