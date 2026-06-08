@@ -467,10 +467,6 @@
                   <option>parts only</option>
                 </select>
               </label>
-              <label>
-                Region
-                <select name="region" id="regionSelect"></select>
-              </label>
             </div>
 
             <div class="actions">
@@ -553,7 +549,6 @@
       const loadSampleButton = document.querySelector("#loadSampleButton");
       const message = document.querySelector("#message");
       const stateSelect = document.querySelector("#stateSelect");
-      const regionSelect = document.querySelector("#regionSelect");
       const apiEndpoint = "https://qodruw90xj.execute-api.us-east-1.amazonaws.com/predict";
       const regionsByState = {
         ca: ["los angeles", "san diego", "san francisco bay area", "sacramento"],
@@ -598,7 +593,7 @@
           paint_color: data.get("paint_color"),
           state: data.get("state").toLowerCase(),
           title_status: data.get("title_status"),
-          region: data.get("region").toLowerCase(),
+          region: defaultRegionForState(data.get("state").toLowerCase()),
         };
       }
 
@@ -608,20 +603,11 @@
           const field = form.elements[key];
           if (field) field.value = value;
         }
-        populateRegions(sample.state, sample.region);
       }
 
-      function populateRegions(state, selectedRegion) {
+      function defaultRegionForState(state) {
         const regions = regionsByState[state] || [];
-        regionSelect.replaceChildren(
-          ...regions.map((region) => {
-            const option = document.createElement("option");
-            option.value = region;
-            option.textContent = region;
-            return option;
-          }),
-        );
-        regionSelect.value = regions.includes(selectedRegion) ? selectedRegion : regions[0] || "";
+        return regions[0] || "";
       }
 
       function renderResponse(body, httpStatus) {
@@ -689,8 +675,7 @@
 
       resetButton.addEventListener("click", fillSample);
       loadSampleButton.addEventListener("click", () => fillSample());
-      stateSelect.addEventListener("change", () => populateRegions(stateSelect.value));
-      populateRegions(samples.toyota_camry.state, samples.toyota_camry.region);
+      stateSelect.addEventListener("change", resetResult);
       fillSample();
     </script>
   </body>
