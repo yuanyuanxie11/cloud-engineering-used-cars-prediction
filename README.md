@@ -18,6 +18,11 @@ scores.
 Official evaluation numbers come only from training on the **real** processed dataset in
 S3—not from local scratch files or the exploratory notebook.
 
+### Dataset
+https://www.kaggle.com/datasets/austinreese/craigslist-carstrucks-data
+
+The dataset we used is based on Craigslist vehicle listings from Kaggle, which are continuously scraped and updated, creating a large-scale and dynamic dataset that requires reproducible preprocessing and periodic retraining to maintain prediction accuracy.
+
 ### Try the live demo
 
 
