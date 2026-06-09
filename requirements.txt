@@ -1,12 +1,30 @@
-# Core data / pipeline (Person 1)
-pandas>=2.0
-pyarrow>=14.0
+# =============================================================================
+# Used Cars ML — unified runtime dependencies (Python 3.10+)
+# =============================================================================
+#
+# Install everything (local dev, EC2/ECS training, pipeline, Lambdas, tests):
+#   pip install -r requirements.txt
+#
+# Dev-only (Ruff lint, CI): pip install -r requirements-dev.txt
+#
+# Predict Lambda (smaller image): serving/requirements.txt — same pins, no EDA libs.
+# Clean-on-upload Lambda: lambda/Dockerfile uses this full file (pipeline only needs pandas/pyarrow).
+#
+# =============================================================================
+
+# --- AWS (S3, CloudWatch metrics) ---
 boto3>=1.34
 
-# ML training (Person 2)
+# --- Data I/O & numerics (Person 1 pipeline + Person 2 ML) ---
+numpy>=1.26
+pandas>=2.0
+pyarrow>=14.0
+
+# --- ML / config (Person 2 — train, serve, features) ---
+pyyaml>=6.0
 scikit-learn>=1.4
 xgboost>=2.0
-pyyaml>=6.0
+
+# --- EDA plotting (training/EC2/ECS only — not in predict Lambda image) ---
 matplotlib>=3.8
 seaborn>=0.13
-numpy>=1.26
